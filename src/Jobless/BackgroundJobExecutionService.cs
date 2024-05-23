@@ -131,7 +131,9 @@ internal class BackgroundJobExecutionService(
         var defaultOrchestrator = scope.ServiceProvider.GetRequiredService<IJobOrchestrator>();
         var orchestrator = scope.ServiceProvider.GetKeyedService<IJobOrchestrator>(message.Category);
 
-        while (!await (orchestrator ?? defaultOrchestrator).CanStartExecution(message, cancellationToken))
+        var attemptedTransition = JobStateTransition.FromAttemptedTransition(JobState.Queued, JobState.Running);
+        while (await (orchestrator ?? defaultOrchestrator).CanTransition(message, attemptedTransition, cancellationToken)
+               is not { Success: true })
         {
             var newMessage = await _jobQueue.DequeueEnqueueAsync(message, cancellationToken);
             if (ReferenceEquals(message, newMessage))
